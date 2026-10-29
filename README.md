@@ -2,6 +2,8 @@
 
 Une page web qui ouvre une facture électronique Factur-X (ou ZUGFeRD), affiche son contenu et vérifie ses totaux. Le PDF est lu dans le navigateur : il n'est envoyé à aucun serveur.
 
+En ligne : https://timaub.fr/factur-x/
+
 ## Pourquoi
 
 Une facture Factur-X est un PDF lisible qui contient, en pièce jointe, un fichier XML avec les mêmes données sous forme structurée. Avec la réforme de la facturation électronique, les entreprises françaises doivent pouvoir recevoir ces factures. Le XML ne se voit pas quand on ouvre le PDF : cet outil le montre, et vérifie que les montants qu'il contient sont cohérents entre eux.
@@ -52,9 +54,9 @@ Node.js 24 :
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:3000/factur-x/
 npm test
-npm run build    # le site statique dans out/
+npm run build    # le site statique dans out/, prévu pour être servi sous /factur-x/
 ```
 
 ## Licence
