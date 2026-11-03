@@ -1,4 +1,4 @@
-import { centsOf, formatCents, sumCents } from "./decimal";
+import { centsOf, formatCents, sumCents, toUnits } from "./decimal";
 import type { Invoice } from "./parse";
 
 // A subset of the EN 16931 business rules, written from the official CII
@@ -25,11 +25,11 @@ const NO_LINES = ["MINIMUM", "BASIC WL"];
 
 const required = (value: unknown, what: string) => (value ? null : `${what} absent.`);
 
+// The stated amount is compared as written, like the Schematron: 204.015 is not 204.02.
 function mismatch(expected: bigint, found: string): string | null {
-  const actual = centsOf(found);
-  return actual === expected
+  return toUnits(found) === toUnits(formatCents(expected))
     ? null
-    : `Attendu ${formatCents(expected)}, trouvé ${formatCents(actual)}.`;
+    : `Attendu ${formatCents(expected)}, trouvé ${found.trim()}.`;
 }
 
 const RULES: Rule[] = [
@@ -131,6 +131,8 @@ const RULES: Rule[] = [
   {
     id: "BR-CO-16",
     label: "Net à payer = total TTC − acomptes + arrondi",
+    // MINIMUM has no prepaid amount (BT-113): its Schematron does not check the amount due.
+    skipFor: ["MINIMUM"],
     check: ({ totals }) => {
       if (!totals.grandTotal || !totals.duePayable) return "Total TTC ou net à payer absent.";
       const expected =

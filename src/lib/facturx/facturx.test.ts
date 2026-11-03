@@ -49,6 +49,11 @@ describe("extractInvoiceXml", () => {
     expect(found.xml).toContain("F-2026-0042");
   });
 
+  it("prefers factur-x.xml to a ZUGFeRD 1.0 XML attached before it", async () => {
+    const pdf = await pdfWith({ "ZUGFeRD-invoice.xml": "<rsm:CrossIndustryDocument/>", "factur-x.xml": xml });
+    expect((await extractInvoiceXml(pdf)).fileName).toBe("factur-x.xml");
+  });
+
   it("explains when the PDF has no invoice XML", async () => {
     await expect(extractInvoiceXml(await pdfWith({}))).rejects.toThrow("aucune pièce jointe");
     await expect(extractInvoiceXml(await pdfWith({ "notes.txt": "x" }))).rejects.toThrow(
@@ -60,6 +65,11 @@ describe("extractInvoiceXml", () => {
     await expect(extractInvoiceXml(new TextEncoder().encode("hello"))).rejects.toThrow(
       "pas un PDF",
     );
+  });
+
+  it("explains when a damaged PDF hides its attachments", async () => {
+    const pdf = await pdfWith({ "factur-x.xml": xml });
+    await expect(extractInvoiceXml(pdf.slice(0, pdf.length / 2))).rejects.toThrow("abîmé");
   });
 });
 
@@ -75,6 +85,17 @@ describe("parseCii", () => {
     expect(invoice.lines).toHaveLength(2);
     expect(invoice.lines[0]).toMatchObject({ quantity: "2", unitCode: "DAY", netAmount: "900.00" });
     expect(invoice.totals).toMatchObject({ taxTotal: "204.02", duePayable: "1224.12" });
+  });
+
+  it.each([
+    ["urn:zugferd.de:2p0:minimum", "MINIMUM"],
+    ["urn:cen.eu:en16931:2017#compliant#urn:zugferd.de:2p0:basic", "BASIC"],
+    ["urn:cen.eu:en16931:2017#conformant#urn:zugferd.de:2p0:extended", "EXTENDED"],
+    ["urn:cen.eu:en16931:2017:compliant:factur-x.eu:1p0:basic", "BASIC"],
+    ["urn:cen.eu:en16931:2017#compliant#urn:xeinkauf.de:kosit:xrechnung_3.0", "XRechnung"],
+    ["urn:cen.eu:en16931:2017#compliant#urn:xoev-de:kosit:standard:xrechnung_1.2", "XRechnung"],
+  ])("recognises the profile of %s", (id, profile) => {
+    expect(parseCii(xml.replace("urn:cen.eu:en16931:2017<", `${id}<`)).profile).toBe(profile);
   });
 
   it("rejects malformed XML and other formats", () => {
@@ -108,6 +129,17 @@ describe("checkInvoice", () => {
     expect(failures(exempt)).toEqual([]);
   });
 
+  it("compares a stated total as written, like the Schematron", () => {
+    const threeDecimals = xml.replace('currencyID="EUR">204.02<', 'currencyID="EUR">204.015<');
+    const result = checkInvoice(parseCii(threeDecimals)).find((r) => r.id === "BR-CO-14");
+    expect(result).toMatchObject({ status: "error", detail: "Attendu 204.02, trouvé 204.015." });
+  });
+
+  it("does not count an issue date without format 102, like BR-03", () => {
+    const freeText = xml.replace('<udt:DateTimeString format="102">20261015', "<udt:DateTimeString>15/10/2026");
+    expect(failures(freeText)).toEqual(["BR-03"]);
+  });
+
   it("reports missing mandatory fields", () => {
     expect(failures(xml.replace("<ram:Name>Client Fictif SAS</ram:Name>", ""))).toEqual(["BR-07"]);
   });
@@ -136,7 +168,15 @@ describe("checkInvoice", () => {
     const minimum = xml.replace("urn:cen.eu:en16931:2017<", "urn:factur-x.eu:1p0:minimum<");
     const skipped = checkInvoice(parseCii(minimum)).filter((r) => r.status === "skipped");
     expect(skipped.map((r) => r.id)).toEqual([
-      "BR-08", "BR-09", "BR-10", "BR-11", "BR-12", "BR-16", "BR-CO-10", "BR-CO-13", "BR-CO-14",
+      "BR-08", "BR-09", "BR-10", "BR-11", "BR-12", "BR-16", "BR-CO-10", "BR-CO-13", "BR-CO-14", "BR-CO-16",
     ]);
+  });
+
+  it("does not check the amount due on a MINIMUM invoice, which cannot state a prepaid amount", () => {
+    // Like the FNFE samples: the Factur-X MINIMUM Schematron accepts DuePayable < GrandTotal.
+    const minimum = xml
+      .replace("urn:cen.eu:en16931:2017<", "urn:factur-x.eu:1p0:minimum<")
+      .replace("<ram:DuePayableAmount>1224.12<", "<ram:DuePayableAmount>1000.00<");
+    expect(failures(minimum)).toEqual([]);
   });
 });

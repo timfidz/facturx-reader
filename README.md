@@ -12,7 +12,7 @@ Une facture Factur-X est un PDF lisible qui contient, en pièce jointe, un fichi
 
 1. Elle cherche dans le PDF la pièce jointe `factur-x.xml` (ou `zugferd-invoice.xml`, `xrechnung.xml`).
 2. Elle lit le XML (syntaxe CII) : numéro, date, type de document, vendeur, acheteur, lignes, ventilation de la TVA, totaux.
-3. Elle détecte le profil (MINIMUM, BASIC WL, BASIC, EN 16931, EXTENDED).
+3. Elle détecte le profil (MINIMUM, BASIC WL, BASIC, EN 16931, EXTENDED, XRechnung), avec les identifiants de Factur-X 1.0 et de ZUGFeRD 2.x.
 4. Elle applique 21 règles de la norme EN 16931 : les champs obligatoires (BR-01 à BR-16) et les calculs de totaux (BR-CO-10, 13, 14, 15, 16).
 
 Les règles ont été écrites à partir du Schematron officiel de la norme ([ConnectingEurope/eInvoicing-EN16931](https://github.com/ConnectingEurope/eInvoicing-EN16931), licence EUPL 1.2), avec ses règles d'arrondi.
@@ -20,13 +20,14 @@ Les règles ont été écrites à partir du Schematron officiel de la norme ([Co
 ## Ce qu'elle ne fait pas
 
 - Ce n'est pas un validateur complet : la norme compte plus d'une centaine de règles, et la page n'en applique que 21. Elle ne valide pas non plus le XML contre les schémas XSD.
-- Elle ne vérifie pas la conformité du PDF à PDF/A-3, et ne lit pas les factures en syntaxe UBL : seule la syntaxe CII, celle de Factur-X, est prise en charge.
-- Pour les profils MINIMUM et BASIC WL, qui n'ont pas de lignes, les règles sur les lignes et les adresses ne sont pas appliquées.
+- Elle ne vérifie pas la conformité du PDF à PDF/A-3, et ne lit pas les factures en syntaxe UBL : seule la syntaxe CII, celle de Factur-X, est prise en charge. Les factures ZUGFeRD 1.0 (2014, un autre format XML) ne sont pas lues non plus.
+- Pour les profils MINIMUM et BASIC WL, qui n'ont pas de lignes, les règles sur les lignes et les adresses ne sont pas appliquées. Pour MINIMUM, qui n'a pas de champ pour les acomptes, le net à payer n'est pas contrôlé non plus, comme dans le Schematron de ce profil.
 
 ## Vérification
 
 - Tests unitaires (Vitest) : extraction depuis un PDF généré pendant le test, lecture du XML, chaque règle en cas de succès et d'échec, calculs sur les décimales.
 - Le 29/10/2026, les 61 factures d'exemple officielles de ZUGFeRD 2.5.2 (tous profils, dont XRechnung) ont toutes été lues sans aucune fausse erreur. Ce passage a montré deux cas à traiter, qui sont couverts par des tests : les sous-lignes du profil EXTENDED, déjà comptées dans leur ligne de regroupement, et le profil MINIMUM, qui n'a pas de ventilation de TVA.
+- Le 03/11/2026, les 126 factures Factur-X et ZUGFeRD 2 du corpus public [ZUGFeRD/corpus](https://github.com/ZUGFeRD/corpus) (factures de nombreux logiciels, dont 22 volontairement fausses) ont été passées dans la page et dans le validateur libre [Mustang](https://www.mustangproject.org/) 2.26.0. Sur les 21 règles, les verdicts sont identiques pour 123 factures ; les 3 autres, refusées par Mustang aussi, sont refusées par la page avec un message (XML UBL, XML mal formé, pièce jointe mal nommée). Ce passage a corrigé trois écarts : les identifiants de profil de ZUGFeRD 2.0 et XRechnung, le net à payer d'une facture MINIMUM, et une facture qui porte aussi un XML ZUGFeRD 1.0. Quarante factures fabriquées pour l'occasion (montants faux, champs absents, PDF abîmé ou chiffré, XML piégé, 2 000 lignes) ont aussi été lues dans Chrome, et les cas douteux comparés à Mustang : deux autres écarts corrigés (un total écrit avec trois décimales, comparé tel quel comme dans le Schematron ; une date sans le format 102, que BR-03 ne compte pas).
 
 ## Choix techniques
 

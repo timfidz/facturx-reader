@@ -93,14 +93,11 @@ function text(parent: Element | undefined, path: string): string | undefined {
   return value || undefined;
 }
 
-// Format 102 is YYYYMMDD.
+// Format 102 is YYYYMMDD; the EN 16931 rules ignore a date without it (BR-03).
 function isoDate(el: Element | undefined): string | undefined {
   const value = el?.textContent?.trim();
-  if (!value) return undefined;
-  if (el?.getAttribute("format") === "102" && /^\d{8}$/.test(value)) {
-    return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
-  }
-  return value;
+  if (!value || el?.getAttribute("format") !== "102") return undefined;
+  return /^\d{8}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}` : value;
 }
 
 function parseParty(el: Element | undefined): Party {
