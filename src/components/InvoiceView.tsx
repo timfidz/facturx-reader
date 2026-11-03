@@ -30,6 +30,14 @@ function decimal(value: string | undefined): string {
     : new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 4 }).format(Number(value));
 }
 
+// A date that does not parse is shown as written in the XML.
+function longDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString("fr-FR", { dateStyle: "long", timeZone: "UTC" });
+}
+
 function PartyCard({ title, party }: { title: string; party: Party }) {
   const { address, legalId } = party;
   return (
@@ -101,7 +109,7 @@ export function InvoiceView({ invoice }: { invoice: Invoice }) {
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="paper space-y-6 rounded-sm p-6 sm:p-12">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <p className="text-sm text-muted">
@@ -110,7 +118,7 @@ export function InvoiceView({ invoice }: { invoice: Invoice }) {
           <h2 className="text-2xl font-semibold">{invoice.number ?? "Sans numéro"}</h2>
           {invoice.issueDate && (
             <p className="text-sm text-muted">
-              Émise le {new Date(invoice.issueDate).toLocaleDateString("fr-FR", { dateStyle: "long", timeZone: "UTC" })}
+              Émise le {longDate(invoice.issueDate)}
             </p>
           )}
         </div>
